@@ -1,0 +1,12 @@
+db:
+ image: postgres
+ entrypoint: /docker-entrypoint.sh
+ command: postgres
+
+geo:
+ image: golang:onbuild
+ command: /app/build_and_go.sh
+ volumes:
+   - .:/app
+ links:
+   - db
