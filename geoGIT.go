@@ -2,54 +2,84 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+
 	_ "github.com/lib/pq"
-    "net/http"
-    "log"
-    "fmt"
-    "encoding/json"
-    "io/ioutil"
+	"github.com/tomnomnom/linkheader"
+	"time"
 )
 
 func main() {
-	db, err := sql.Open("postgres", "user=postgres password=postgres dbname=geogit host=db sslmode=disable")
+
+	type GitHubAPIresponse struct {
+		URL  string `json:"url"`
+		Name string `json:"name"`
+	}
+	var newRepo []GitHubAPIresponse
+	count := 0
+	// type GitHubAPIerror struct {
+	//     message string `json:"message"`
+	// }
+	// var github_message GitHubAPIerror
+
+	db, err := sql.Open("postgres", "user=postgres dbname=geogit sslmode=disable")
+
+	// db, err := sql.Open("postgres", "user=postgres password=postgres dbname=geogit host=db sslmode=disable")
 	if err != nil {
-			log.Fatal(err)
+		log.Fatal(err)
 
 	}
-    defer db.Close()
+	defer db.Close()
 
-    _,  err = db.Query("SELECT * FROM repos")
+	_, err = db.Query("SELECT * FROM repos")
 	if err != nil {
-		_,  _err := db.Query("CREATE TABLE repos (URL TEXT NOT NULL, NAME TEXT NOT NULL)")
+		_, _err := db.Query("CREATE TABLE repos (URL TEXT NOT NULL, NAME TEXT NOT NULL)")
 		if _err != nil {
 			log.Fatal(_err)
 			panic(fmt.Sprintf("Fuck you and your tables"))
 		}
 	}
-
-	res, err := http.Get("https://api.github.com/repositories?since=364")
-	if err != nil {
-		log.Fatal(err)
-	}
-	body, err := ioutil.ReadAll(res.Body)
-
-	type GitHubAPIresponse struct {
-	    URL string `json:"url"`
-	    Name string `json:"name"`
-	}
-	var new_repo []GitHubAPIresponse
-
-	err = json.Unmarshal(body, &new_repo)
-    if(err != nil){
-        fmt.Println("whoops:", err)
-    }
-
-    for each := range new_repo{
-    	_,  err = db.Query("INSERT INTO repos (name, url) VALUES ('" + new_repo[each].Name + "', '" + new_repo[each].URL + "');")
-    	if err != nil {
+	rel := "next"
+	link := "https://api.github.com/repositories"
+	for rel == "next" {
+		res, err := http.Get(link)
+		if err != nil {
 			log.Fatal(err)
 		}
-    }
+		if len(res.Header["Link"]) > 0 {
+			links := linkheader.Parse(res.Header["Link"][0])
+			if len(links) > 0 {
+				link = links[0].URL
+				rel = links[0].Rel
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+		defer res.Body.Close()
+		body, err := ioutil.ReadAll(res.Body)
+		fmt.Println(body[1])
+		err = json.Unmarshal(body, &newRepo)
+		if err != nil {
+			fmt.Println("whoops:", err)
+		}
 
+		for each := range newRepo {
+			fmt.Println(newRepo[each].Name, newRepo[each].URL)
+			row, err := db.Query("INSERT INTO repos (name, url) VALUES ('" + newRepo[each].Name + "', '" + newRepo[each].URL + "');")
+			if err != nil {
+				log.Fatal(err)
+			}
+			row.Close()
+			count++
 
+		}
+		time.Sleep(60000 * time.Millisecond)
+	}
+	fmt.Println(count, " repos added")
 }
