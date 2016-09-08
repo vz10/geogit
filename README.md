@@ -10,3 +10,5 @@ If you use Kitematic then run
 # eval "$(docker-machine env default)"
 # docker build -t geogit .
 ```
+
+If everything went ok, you can run `docker-compose up`
