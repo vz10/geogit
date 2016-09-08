@@ -1,5 +1,9 @@
 db:
  image: postgres
+ environment:
+ - POSTGRES_USER=docker
+ - POSTGRES_PASSWORD=docker
+ - POSTGRES_DB=geogit
  entrypoint: /docker-entrypoint.sh
  command: postgres
 
