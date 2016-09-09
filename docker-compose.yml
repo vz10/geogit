@@ -1,13 +1,22 @@
-db:
- image: postgres
- env_file: db.env
- entrypoint: /docker-entrypoint.sh
- command: postgres
+version: '2'
+services:
+  db:
+   container_name: db
+   image: postgres
+   volumes:
+    - db_datavolume:/var/lib/postgresql/data
+   env_file: db.env
+   entrypoint: /docker-entrypoint.sh
+   command: postgres
 
-geo:
- image: golang:onbuild
- command: /app/build_and_go.sh
- volumes:
-   - .:/app
- links:
-   - db
+  geo:
+   container_name: geo
+   image: golang:onbuild
+   command: /app/build_and_go.sh
+   volumes:
+     - .:/app
+   links:
+     - db
+
+volumes:
+  db_datavolume:
