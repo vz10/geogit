@@ -26,9 +26,10 @@ func main() {
 	// }
 	// var github_message GitHubAPIerror
 
-	db, err := sql.Open("postgres", "user=postgres dbname=geogit sslmode=disable")
+	// db, err := sql.Open("postgres", "user=postgres dbname=geogit sslmode=disable")
 
-	// db, err := sql.Open("postgres", "user=postgres password=postgres dbname=geogit host=db sslmode=disable")
+    // TODO use ENV variables for user, pass, db_name
+	db, err := sql.Open("postgres", "user=docker password=docker dbname=geogit host=db sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 
