@@ -7,25 +7,36 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-
+	"os"
 	_ "github.com/lib/pq"
 	"github.com/tomnomnom/linkheader"
 	"time"
 )
 
+type Configuration struct {
+    Client_id    string
+    Client_secret   string
+}
+
+type GitHubAPIresponse struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+	Message string `json:"message"`
+}
+
 func main() {
 
-	type GitHubAPIresponse struct {
-		URL  string `json:"url"`
-		Name string `json:"name"`
-	}
 	var newRepo []GitHubAPIresponse
+	var configuration Configuration
 	count := 0
-	// type GitHubAPIerror struct {
-	//     message string `json:"message"`
-	// }
-	// var github_message GitHubAPIerror
 
+	file, _ := os.Open("config.json")
+	decoder := json.NewDecoder(file)
+	err := decoder.Decode(&configuration)
+	if err != nil {
+	  fmt.Println("error:", err)
+	}
+	
 	// db, err := sql.Open("postgres", "user=postgres dbname=geogit sslmode=disable")
 
     // TODO use ENV variables for user, pass, db_name
@@ -36,16 +47,18 @@ func main() {
 	}
 	defer db.Close()
 
-	_, err = db.Query("SELECT * FROM repos")
+	rows, err := db.Query("SELECT * FROM repos")
 	if err != nil {
-		_, _err := db.Query("CREATE TABLE repos (URL TEXT NOT NULL, NAME TEXT NOT NULL)")
+		_, _err := db.Query("CREATE TABLE repos (URL TEXT NOT NULL, NAME TEXT NOT NULL,  IS_GEO BOOLEAN DEFAULT FALSE, CONSTRAINT u_constraint UNIQUE (URL))")
 		if _err != nil {
 			log.Fatal(_err)
 			panic(fmt.Sprintf("Fuck you and your tables"))
 		}
+	} else {
+		rows.Close()
 	}
 	rel := "next"
-	link := "https://api.github.com/repositories"
+	link := "https://api.github.com/repositories?client_id="+configuration.Client_id+"&client_secret="+configuration.Client_secret
 	for rel == "next" {
 		res, err := http.Get(link)
 		if err != nil {
@@ -60,6 +73,9 @@ func main() {
 				break
 			}
 		} else {
+			fmt.Println(res.Header)
+			fmt.Println("*************")
+			fmt.Println(res.Body)
 			break
 		}
 		defer res.Body.Close()
@@ -72,7 +88,7 @@ func main() {
 
 		for each := range newRepo {
 			fmt.Println(newRepo[each].Name, newRepo[each].URL)
-			row, err := db.Query("INSERT INTO repos (name, url) VALUES ('" + newRepo[each].Name + "', '" + newRepo[each].URL + "');")
+			row, err := db.Query("INSERT INTO repos (name, url) VALUES ('" + newRepo[each].Name + "', '" + newRepo[each].URL + "') ON CONFLICT (URL) DO NOTHING;")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -80,7 +96,7 @@ func main() {
 			count++
 
 		}
-		time.Sleep(60000 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 	fmt.Println(count, " repos added")
 }
