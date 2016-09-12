@@ -11,6 +11,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/tomnomnom/linkheader"
 	"time"
+	"strconv"
 )
 
 type Configuration struct {
@@ -22,6 +23,16 @@ type GitHubAPIresponse struct {
 	URL  string `json:"url"`
 	Name string `json:"name"`
 	Message string `json:"message"`
+}
+
+func checkCount(rows *sql.Rows) (count int) {
+ 	for rows.Next() {
+    	err := rows.Scan(&count)
+    	if err != nil {
+   			panic(err)
+    	}
+    }   
+    return count
 }
 
 func main() {
@@ -58,7 +69,9 @@ func main() {
 		rows.Close()
 	}
 	rel := "next"
-	link := "https://api.github.com/repositories?client_id="+configuration.Client_id+"&client_secret="+configuration.Client_secret
+	rows, err = db.Query("SELECT COUNT(*) as count FROM repos")
+ 	repos_downloaded := checkCount(rows)
+	link := "https://api.github.com/repositories?client_id="+configuration.Client_id+"&client_secret="+configuration.Client_secret+"&since="+strconv.Itoa(repos_downloaded)
 	for rel == "next" {
 		res, err := http.Get(link)
 		if err != nil {
@@ -80,7 +93,6 @@ func main() {
 		}
 		defer res.Body.Close()
 		body, err := ioutil.ReadAll(res.Body)
-		fmt.Println(body[1])
 		err = json.Unmarshal(body, &newRepo)
 		if err != nil {
 			fmt.Println("whoops:", err)
@@ -94,7 +106,6 @@ func main() {
 			}
 			row.Close()
 			count++
-
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
